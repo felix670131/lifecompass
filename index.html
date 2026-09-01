@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>人生羅盤 LifeCompass v3.2.1</title>
+<title>人生羅盤 LifeCompass v3.2.2</title>
 <style>
 :root {
   --bg: #FFF8EC; --surface: #FFFFFF; --surface-light: #FFF3DC; --border: #F0DEB8;
@@ -435,7 +435,7 @@ textarea.ai-form-ctrl { resize: vertical; min-height: 90px; font-family: inherit
         <div style="min-width:0;">
         <div class="wrap-brand-name-row" style="display:flex;align-items:baseline;gap:6px;min-width:0;">
             <div class="name">人生羅盤 LifeCompass</div>
-            <span class="brand-version" style="font-size:10.5px;color:var(--faint);font-weight:600;white-space:nowrap;">v3.2.1</span>
+            <span class="brand-version" style="font-size:10.5px;color:var(--faint);font-weight:600;white-space:nowrap;">v3.2.2</span>
           </div>
           <div class="tag">找到方向，也聽懂話裡的話</div>
         </div>
@@ -635,6 +635,12 @@ textarea.ai-form-ctrl { resize: vertical; min-height: 90px; font-family: inherit
     </div>
 
     <button class="nav-single" data-nav-section="teampulse" onclick="goSection('teampulse')" title="企業／團隊 MVP：去識別化聚合的團隊幸福感總覽"><span aria-hidden="true">🏢</span><span class="lbl">團隊脈動（企業版）</span></button>
+
+    <!-- v3.2.2 新增：登入紀錄（管理者專用）。這個選單項目所有登入的使用者都看得到、
+         可以點，但實際能不能看到內容是由後端 netlify/functions/login-logs.js
+         依 Netlify 環境變數 ADMIN_EMAILS 判斷；不是管理者的帳號點進來只會看到
+         「沒有權限」的提示，不會看到任何其他使用者的資料。 -->
+    <button class="nav-single" data-nav-section="adminloginlog" onclick="goSection('adminloginlog')" title="管理者專用：查看使用者登入紀錄"><span aria-hidden="true">🔐</span><span class="lbl">登入紀錄</span></button>
   </nav>
 
   <main class="content-area" id="app" tabindex="-1"></main>
@@ -1943,7 +1949,7 @@ function findAbcPatternCluster(entries) {
    v0.5.4 UI 渲染層（純 vanilla JS，無框架依賴，單一HTML檔可離線開啟）
 =========================================================== */
 
-const APP_VERSION = "v3.2.1";
+const APP_VERSION = "v3.2.2";
 /* v2.9 側邊選單重新排序（依《LifeCompass_側邊選單重新排序提案_v2.7.md》Option A 執行，
    使用者要求「重新排列將重要由上到下排序，讓使用者易懂明白為主」）：
    ①【DOM 排序】選單一級區塊從原本「首頁／打卡／人生羅盤／核心價值觀／依戀類型測驗／
@@ -2658,6 +2664,8 @@ const state = {
     }])),
   },
   dashboard: { aiText: "", aiLoading: false, aiError: "", aiSource: "", manualNote: "", saveMsg: "", dataMsg: "" },
+  /* v3.2.2 新增：管理者登入紀錄頁面用的狀態（見 viewAdminLoginLogSection / loadAdminLoginLog） */
+  adminLoginLog: { loading: false, loaded: false, error: "", records: null },
   /* v1.3.6 Phase 2 新增：企業／團隊 MVP（去識別化聚合，Beta） */
   teampulse: {
     teamCodeInput: "", teamCode: "", consentChecked: false,
@@ -2880,6 +2888,7 @@ function viewRoot() {
   else if (state.section === "dashboard") inner = viewDashboardSection();
   else if (state.section === "teampulse") inner = viewTeamPulseSection();
   else if (state.section === "checkin") inner = viewCheckinSection();
+  else if (state.section === "adminloginlog") inner = viewAdminLoginLogSection();
   else inner = viewCoachSection();
   const home = state.section === "home" ? "" : quickHomeLink();
   return '<div class="shell">' + home + inner + "</div>";
@@ -4259,6 +4268,84 @@ function importAllData(file) {
     }
   };
   reader.readAsText(file);
+}
+
+/* v3.2.2 新增：管理者專用的「登入紀錄」頁面。
+   資料來源是 netlify/functions/login-logs.js，它會用 Netlify Identity 驗證目前
+   登入的人是誰，再比對 Netlify 環境變數 ADMIN_EMAILS（在 Netlify 後台設定，
+   逗號分隔的信箱清單）——只有信箱在清單裡的人，這支 API 才會回傳資料，
+   其他人一律拿到「沒有權限」的訊息，不會看到任何其他使用者的登入紀錄。
+   前端這裡完全不做權限判斷（因為前端程式碼使用者看得到、可以竄改，判斷了也沒用），
+   單純負責顯示 API 回傳的結果或錯誤訊息。 */
+function viewAdminLoginLogSection() {
+  const s = state.adminLoginLog;
+  if (!s.loaded && !s.loading) loadAdminLoginLog();
+
+  let body;
+  if (s.loading) {
+    body = '<p class="body-text faint">正在讀取登入紀錄…</p>';
+  } else if (s.error) {
+    body = '<p class="body-text" style="color:#B33A3A;">' + escapeHtml(s.error) + "</p>";
+  } else if (!s.records || s.records.length === 0) {
+    body = '<p class="body-text faint">目前還沒有任何登入紀錄。</p>';
+  } else {
+    const rows = s.records.map(function (r) {
+      const t = r.ts ? new Date(r.ts).toLocaleString("zh-TW", { hour12: false }) : "（未知時間）";
+      const who = escapeHtml(r.name || r.email || r.userId || "（未知使用者）");
+      const email = escapeHtml(r.email || "");
+      const provider = escapeHtml(r.provider || "");
+      const ip = escapeHtml(r.ip || "");
+      return '<tr><td style="padding:6px 10px;white-space:nowrap;">' + escapeHtml(t) + "</td>" +
+        '<td style="padding:6px 10px;">' + who + "</td>" +
+        '<td style="padding:6px 10px;">' + email + "</td>" +
+        '<td style="padding:6px 10px;">' + provider + "</td>" +
+        '<td style="padding:6px 10px;">' + ip + "</td></tr>";
+    }).join("");
+    body = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12.5px;">' +
+      '<thead><tr style="text-align:left;border-bottom:1px solid var(--border);">' +
+      '<th style="padding:6px 10px;">登入時間</th><th style="padding:6px 10px;">名稱</th>' +
+      '<th style="padding:6px 10px;">信箱</th><th style="padding:6px 10px;">登入方式</th>' +
+      '<th style="padding:6px 10px;">IP</th></tr></thead><tbody>' + rows + "</tbody></table></div>" +
+      '<p class="faint" style="font-size:11.5px;margin-top:10px;">最多顯示最近 300 筆，由新到舊排序。</p>';
+  }
+
+  return '<div class="card"><h3>🔐 登入紀錄</h3>' +
+    '<p class="sub">記錄每次有人透過 Google 帳號登入這個網站的時間，僅限管理者（ADMIN_EMAILS）查看。</p>' +
+    '<div style="margin-bottom:14px;"><button class="btn btn-ghost" ' + (s.loading ? "disabled" : "") +
+    ' onclick="loadAdminLoginLog()">🔄 重新整理</button></div>' + body + "</div>";
+}
+
+async function loadAdminLoginLog() {
+  const s = state.adminLoginLog;
+  s.loading = true; s.error = ""; rerender();
+
+  const user = getIdentityUser();
+  if (!user) {
+    s.loading = false; s.loaded = true;
+    s.error = "尚未登入，無法查看登入紀錄。";
+    rerender();
+    return;
+  }
+
+  try {
+    const token = await getIdentityToken();
+    const res = await fetch("/.netlify/functions/login-logs", {
+      headers: { Authorization: "Bearer " + token },
+    });
+    const data = await res.json().catch(function () { return {}; });
+    if (!res.ok) {
+      s.error = data && data.error ? data.error : "讀取登入紀錄失敗（" + res.status + "）";
+      s.records = null;
+    } else {
+      s.records = (data && data.records) || [];
+      s.error = "";
+    }
+  } catch (e) {
+    s.error = "連線失敗，請確認網路連線後重試。";
+    s.records = null;
+  }
+  s.loading = false; s.loaded = true;
+  rerender();
 }
 
 async function resetAllData() {
@@ -5831,6 +5918,27 @@ if (typeof refreshAiStatusUi === "function") refreshAiStatusUi();
       window.__lcUserName = name;
     }
     if (chip && window.__lcUserName) chip.textContent = "你好，" + window.__lcUserName;
+    recordLoginOnce(user);
+  }
+
+  /* v3.2.2 新增：每次「這個瀏覽器分頁」確認登入身分後，記一筆登入紀錄到後端
+     （netlify/functions/log-login.js → Netlify Blobs），給管理者在「登入紀錄」
+     頁面查看。用 sessionStorage 做一個旗標，同一個分頁只記一次，不會每次畫面
+     重繪、每次點擊都狂送記錄；分頁重開或登出再登入會重新記一筆，這是預期行為。
+     記錄失敗（例如網路問題、還沒部署後端）不會影響登入本身或擋住使用者操作，
+     安靜失敗即可。 */
+  function recordLoginOnce(user) {
+    try {
+      if (sessionStorage.getItem("lc_login_logged_v1")) return;
+      sessionStorage.setItem("lc_login_logged_v1", "1");
+    } catch (e) { /* sessionStorage 不可用就算了，不影響登入本身 */ }
+    if (!user || typeof user.jwt !== "function") return;
+    user.jwt().then(function (token) {
+      return fetch("/.netlify/functions/log-login", {
+        method: "POST",
+        headers: { Authorization: "Bearer " + token },
+      });
+    }).catch(function () { /* 安靜失敗，不影響使用者 */ });
   }
 
   // 找不到 Netlify Identity 元件（例如尚未部署到 Netlify、或該環境不支援）→ 直接放行，
