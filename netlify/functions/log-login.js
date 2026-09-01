@@ -7,9 +7,13 @@
 //
 // 這支程式不需要你修改任何內容，照著部署說明操作即可。
 
-const { getStore } = require("@netlify/blobs");
+const { getStore, connectLambda } = require("@netlify/blobs");
 
 exports.handler = async (event, context) => {
+  // v3.2.3 修復：Lambda 相容模式必須先呼叫 connectLambda(event) 才能用 Netlify Blobs，
+  // 否則會出現 MissingBlobsEnvironmentError（詳見 data.js 裡的說明）。
+  connectLambda(event);
+
   if (event.httpMethod !== "POST") {
     return jsonResponse(405, { error: "不支援的方法" });
   }

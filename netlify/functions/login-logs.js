@@ -9,11 +9,15 @@
 // 這支程式不需要你修改任何內容，只要照部署說明去 Netlify 後台設定
 // ADMIN_EMAILS 這個環境變數即可。
 
-const { getStore } = require("@netlify/blobs");
+const { getStore, connectLambda } = require("@netlify/blobs");
 
 const MAX_RECORDS = 300;
 
 exports.handler = async (event, context) => {
+  // v3.2.3 修復：Lambda 相容模式必須先呼叫 connectLambda(event) 才能用 Netlify Blobs，
+  // 否則會出現 MissingBlobsEnvironmentError（詳見 data.js 裡的說明）。
+  connectLambda(event);
+
   if (event.httpMethod !== "GET") {
     return jsonResponse(405, { error: "不支援的方法" });
   }

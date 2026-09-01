@@ -16,9 +16,16 @@
 //
 // 你不需要修改這支檔案的任何內容，照著說明部署即可正常運作。
 
-const { getStore } = require("@netlify/blobs");
+const { getStore, connectLambda } = require("@netlify/blobs");
 
 exports.handler = async (event, context) => {
+  // v3.2.3 修復：這支程式用的是「Lambda 相容模式」的寫法（exports.handler），
+  // Netlify Blobs 在這種模式下不會自動注入連線資訊，一定要在呼叫 getStore()
+  // 之前手動呼叫 connectLambda(event)，否則會出現
+  // 「MissingBlobsEnvironmentError: The environment has not been configured...」
+  // 這個錯誤。這是 Netlify Blobs 官方文件裡明確要求的寫法，不是你操作錯誤。
+  connectLambda(event);
+
   // 只允許 GET（讀取）與 POST（寫入）
   if (event.httpMethod !== "GET" && event.httpMethod !== "POST") {
     return jsonResponse(405, { error: "不支援的方法" });
