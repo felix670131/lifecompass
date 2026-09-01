@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>人生羅盤 LifeCompass v3.2.3</title>
+<title>人生羅盤 LifeCompass v3.2.4</title>
 <style>
 :root {
   --bg: #FFF8EC; --surface: #FFFFFF; --surface-light: #FFF3DC; --border: #F0DEB8;
@@ -435,7 +435,7 @@ textarea.ai-form-ctrl { resize: vertical; min-height: 90px; font-family: inherit
         <div style="min-width:0;">
         <div class="wrap-brand-name-row" style="display:flex;align-items:baseline;gap:6px;min-width:0;">
             <div class="name">人生羅盤 LifeCompass</div>
-            <span class="brand-version" style="font-size:10.5px;color:var(--faint);font-weight:600;white-space:nowrap;">v3.2.3</span>
+            <span class="brand-version" style="font-size:10.5px;color:var(--faint);font-weight:600;white-space:nowrap;">v3.2.4</span>
           </div>
           <div class="tag">找到方向，也聽懂話裡的話</div>
         </div>
@@ -636,7 +636,7 @@ textarea.ai-form-ctrl { resize: vertical; min-height: 90px; font-family: inherit
 
     <button class="nav-single" data-nav-section="teampulse" onclick="goSection('teampulse')" title="企業／團隊 MVP：去識別化聚合的團隊幸福感總覽"><span aria-hidden="true">🏢</span><span class="lbl">團隊脈動（企業版）</span></button>
 
-    <!-- v3.2.3 新增：登入紀錄（管理者專用）。這個選單項目所有登入的使用者都看得到、
+    <!-- v3.2.2 新增：登入紀錄（管理者專用）。這個選單項目所有登入的使用者都看得到、
          可以點，但實際能不能看到內容是由後端 netlify/functions/login-logs.js
          依 Netlify 環境變數 ADMIN_EMAILS 判斷；不是管理者的帳號點進來只會看到
          「沒有權限」的提示，不會看到任何其他使用者的資料。 -->
@@ -1949,7 +1949,7 @@ function findAbcPatternCluster(entries) {
    v0.5.4 UI 渲染層（純 vanilla JS，無框架依賴，單一HTML檔可離線開啟）
 =========================================================== */
 
-const APP_VERSION = "v3.2.3";
+const APP_VERSION = "v3.2.4";
 /* v2.9 側邊選單重新排序（依《LifeCompass_側邊選單重新排序提案_v2.7.md》Option A 執行，
    使用者要求「重新排列將重要由上到下排序，讓使用者易懂明白為主」）：
    ①【DOM 排序】選單一級區塊從原本「首頁／打卡／人生羅盤／核心價值觀／依戀類型測驗／
@@ -2664,7 +2664,7 @@ const state = {
     }])),
   },
   dashboard: { aiText: "", aiLoading: false, aiError: "", aiSource: "", manualNote: "", saveMsg: "", dataMsg: "" },
-  /* v3.2.3 新增：管理者登入紀錄頁面用的狀態（見 viewAdminLoginLogSection / loadAdminLoginLog） */
+  /* v3.2.2 新增：管理者登入紀錄頁面用的狀態（見 viewAdminLoginLogSection / loadAdminLoginLog） */
   adminLoginLog: { loading: false, loaded: false, error: "", records: null },
   /* v1.3.6 Phase 2 新增：企業／團隊 MVP（去識別化聚合，Beta） */
   teampulse: {
@@ -4270,7 +4270,7 @@ function importAllData(file) {
   reader.readAsText(file);
 }
 
-/* v3.2.3 新增：管理者專用的「登入紀錄」頁面。
+/* v3.2.2 新增：管理者專用的「登入紀錄」頁面。
    資料來源是 netlify/functions/login-logs.js，它會用 Netlify Identity 驗證目前
    登入的人是誰，再比對 Netlify 環境變數 ADMIN_EMAILS（在 Netlify 後台設定，
    逗號分隔的信箱清單）——只有信箱在清單裡的人，這支 API 才會回傳資料，
@@ -5921,24 +5921,34 @@ if (typeof refreshAiStatusUi === "function") refreshAiStatusUi();
     recordLoginOnce(user);
   }
 
-  /* v3.2.3 新增：每次「這個瀏覽器分頁」確認登入身分後，記一筆登入紀錄到後端
-     （netlify/functions/log-login.js → Netlify Blobs），給管理者在「登入紀錄」
-     頁面查看。用 sessionStorage 做一個旗標，同一個分頁只記一次，不會每次畫面
-     重繪、每次點擊都狂送記錄；分頁重開或登出再登入會重新記一筆，這是預期行為。
-     記錄失敗（例如網路問題、還沒部署後端）不會影響登入本身或擋住使用者操作，
-     安靜失敗即可。 */
+  /* v3.2.3 新增，v3.2.4 修正：每次「這個瀏覽器分頁」確認登入身分後，記一筆登入
+     紀錄到後端（netlify/functions/log-login.js → Netlify Blobs），給管理者在
+     「登入紀錄」頁面查看。用 sessionStorage 做一個旗標，同一個分頁成功記錄過
+     一次之後就不再重送，不會每次畫面重繪、每次點擊都狂送記錄；分頁重開或登出
+     再登入會重新記一筆，這是預期行為。
+     v3.2.4 缺失修復：原本旗標是「送出前」就先設定，如果那次送出剛好失敗
+     （例如剛好遇到後端還沒修好 connectLambda 那個問題、或當下網路不穩），
+     旗標還是會被設成「已記錄」，導致同一個分頁之後即使後端恢復正常、
+     重新整理頁面或重新登入，也不會再補送這筆記錄，看起來就像「記錄消失了」。
+     修正後改成：只有在後端明確回傳成功（res.ok）之後才設定旗標，任何失敗
+     （包含網路問題、伺服器錯誤）都不會設定旗標，下次同一分頁再次觸發登入流程
+     時就會自動重試，不會被卡住。 */
   function recordLoginOnce(user) {
+    let flagOk = true;
     try {
       if (sessionStorage.getItem("lc_login_logged_v1")) return;
-      sessionStorage.setItem("lc_login_logged_v1", "1");
-    } catch (e) { /* sessionStorage 不可用就算了，不影響登入本身 */ }
+    } catch (e) { flagOk = false; /* sessionStorage 不可用就算了，不影響登入本身，但也沒辦法防重複 */ }
     if (!user || typeof user.jwt !== "function") return;
     user.jwt().then(function (token) {
       return fetch("/.netlify/functions/log-login", {
         method: "POST",
         headers: { Authorization: "Bearer " + token },
       });
-    }).catch(function () { /* 安靜失敗，不影響使用者 */ });
+    }).then(function (res) {
+      if (res && res.ok && flagOk) {
+        try { sessionStorage.setItem("lc_login_logged_v1", "1"); } catch (e) { /* 忽略 */ }
+      }
+    }).catch(function () { /* 安靜失敗，不影響使用者，旗標也不會被設定，下次會自動重試 */ });
   }
 
   // 找不到 Netlify Identity 元件（例如尚未部署到 Netlify、或該環境不支援）→ 直接放行，
